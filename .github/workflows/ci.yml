@@ -13,10 +13,10 @@ jobs:
     
     steps:
     - name: Clonar código
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4  # ✅ Actualizado a v4
     
     - name: Configurar Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5  # ✅ Actualizado a v5
       with:
         python-version: '3.9'
     
@@ -26,7 +26,7 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov flake8
     
-    - name: Verificar sintaxis con flake8
+    - name: Verificar calidad de código
       run: |
         flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
     
@@ -34,8 +34,7 @@ jobs:
       run: |
         pytest tests/ -v --cov=src --cov-report=xml
     
-    - name: Subir cobertura a Codecov
-      uses: codecov/codecov-action@v3
+    - name: Subir cobertura
+      uses: codecov/codecov-action@v4  # ✅ Actualizado a v4
       with:
         file: ./coverage.xml
-        flags: unittests
