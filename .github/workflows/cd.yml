@@ -1,0 +1,48 @@
+# .github/workflows/cd.yml
+name: CD - Despliegue Continuo
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Permite ejecutar manualmente
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Clonar código
+      uses: actions/checkout@v3
+    
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Instalar dependencias
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Ejecutar pipeline de datos
+      run: |
+        python src/data_ingestion.py
+        python src/feature_engineering.py
+    
+    - name: Entrenar modelo
+      env:
+        MLFLOW_TRACKING_URI: file:./mlflow_runs
+      run: |
+        python src/train_model.py
+    
+    - name: Subir artefactos
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-artifacts
+        path: |
+          mlflow_runs/
+          data/processed/
+    
+    - name: Notificar despliegue
+      run: |
+        echo "✅ Despliegue completado para NVIDIA_Price_Predictor"

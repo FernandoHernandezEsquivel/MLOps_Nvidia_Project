@@ -1,0 +1,42 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Servicio 1: MinIO (Simula el S3 de AWS)
+  minio:
+    image: minio/minio:latest
+    container_name: minio_nvidia
+    ports:
+      - "9000:9000"   # Puerto para conectar con la API
+      - "9001:9001"   # Puerto para la interfaz web
+    environment:
+      MINIO_ROOT_USER: minioadmin     # Usuario
+      MINIO_ROOT_PASSWORD: minioadmin # Contraseña
+    volumes:
+      - ./data/minio_data:/data       # DONDE guarda los archivos localmente
+    command: server /data --console-address ":9001"
+    networks:
+      - nvidia_network
+
+  # Servicio 2: MLflow (Rastrea experimentos y modelos)
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow_nvidia
+    ports:
+      - "5000:5000"   # Puerto para la interfaz web de MLflow
+    environment:
+      MLFLOW_TRACKING_URI: sqlite:////mlflow/mlflow.db
+    volumes:
+      - ./data/mlflow_data:/mlflow    # DONDE guarda los experimentos
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root ./mlflow/artifacts
+    networks:
+      - nvidia_network
+
+networks:
+  nvidia_network:
+    driver: bridge

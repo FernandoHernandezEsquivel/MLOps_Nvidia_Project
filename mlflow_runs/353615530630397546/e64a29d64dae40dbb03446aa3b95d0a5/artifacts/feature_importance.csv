@@ -1,0 +1,14 @@
+feature,importance
+High,0.5236226
+Low,0.11086998
+MA_50,0.09593161
+MA_10,0.074961916
+Volume_MA_10,0.031256206
+Volatility_10d,0.026409829
+Close_Open_Ratio,0.025525257
+Open,0.023964548
+High_Low_Ratio,0.023356786
+Volume_Ratio,0.02248072
+Volume,0.017505318
+Return_5d,0.012714976
+Return_10d,0.011400409

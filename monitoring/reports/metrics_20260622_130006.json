@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-06-22T13:00:06.871221",
+  "dataset_drift": true,
+  "drift_share": 0.5,
+  "number_of_drifted_columns": 10,
+  "total_columns": 15
+}

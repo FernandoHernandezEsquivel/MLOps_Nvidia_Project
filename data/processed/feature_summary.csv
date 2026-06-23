@@ -1,0 +1,17 @@
+Feature,Type,Non-Null Count,Null Count
+Date,datetime64[ns],452,0
+Close,float64,452,0
+High,float64,452,0
+Low,float64,452,0
+Open,float64,452,0
+Volume,int64,452,0
+Return_1d,float64,452,0
+Return_5d,float64,452,0
+Return_10d,float64,452,0
+MA_10,float64,452,0
+MA_50,float64,452,0
+Volatility_10d,float64,452,0
+Volume_MA_10,float64,452,0
+Volume_Ratio,float64,452,0
+High_Low_Ratio,float64,452,0
+Close_Open_Ratio,float64,452,0

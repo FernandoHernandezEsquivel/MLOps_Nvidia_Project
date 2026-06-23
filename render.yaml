@@ -1,0 +1,15 @@
+# render.yaml
+services:
+  - type: web
+    name: nvidia-price-api
+    runtime: docker
+    repo: https://github.com/FernandoHernandezEsquivel/MLOps_Nvidia_Project
+    branch: main
+    dockerfilePath: ./serving/Dockerfile
+    envVars:
+      - key: MLFLOW_TRACKING_URI
+        value: file:./mlflow_runs
+      - key: MODEL_NAME
+        value: NVIDIA_Price_Predictor
+    healthCheckPath: /health
+    autoDeploy: true

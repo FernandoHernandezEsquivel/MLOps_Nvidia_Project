@@ -1,0 +1,42 @@
+artifact_path: file:///Users/fernandohernandezesquivel/Documents/MLops_Project/mlflow_runs/504246946478130849/models/m-56df30315e2f4c298c656aa55c3741fd/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.9.7
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.6.1
+is_signature_from_type_hint: false
+mlflow_version: 3.1.4
+model_id: m-56df30315e2f4c298c656aa55c3741fd
+model_size_bytes: 301930
+model_uuid: m-56df30315e2f4c298c656aa55c3741fd
+prompts: null
+run_id: 66507e7255c84dbd957fae7b5aed990d
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "High", "required": true}, {"type": "double",
+    "name": "Low", "required": true}, {"type": "double", "name": "Open", "required":
+    true}, {"type": "long", "name": "Volume", "required": true}, {"type": "double",
+    "name": "Return_5d", "required": true}, {"type": "double", "name": "Return_10d",
+    "required": true}, {"type": "double", "name": "MA_10", "required": true}, {"type":
+    "double", "name": "MA_50", "required": true}, {"type": "double", "name": "Volatility_10d",
+    "required": true}, {"type": "double", "name": "Volume_MA_10", "required": true},
+    {"type": "double", "name": "Volume_Ratio", "required": true}, {"type": "double",
+    "name": "High_Low_Ratio", "required": true}, {"type": "double", "name": "Close_Open_Ratio",
+    "required": true}]'
+  outputs: '[{"type": "float", "required": true}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-06-21 21:53:23.691006'

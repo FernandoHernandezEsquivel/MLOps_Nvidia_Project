@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/fernandohernandezesquivel/Documents/MLops_Project/mlflow_runs/353615530630397546/0b48d35e5cff4025aa1e5808d5ca046e/artifacts
+end_time: 1781990473496
+entry_point_name: ''
+experiment_id: '353615530630397546'
+lifecycle_stage: active
+run_id: 0b48d35e5cff4025aa1e5808d5ca046e
+run_name: train_20260620_1521
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1781990469154
+status: 3
+tags: []
+user_id: fernandohernandezesquivel

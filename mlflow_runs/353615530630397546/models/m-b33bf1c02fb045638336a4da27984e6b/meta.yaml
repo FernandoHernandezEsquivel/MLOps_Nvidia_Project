@@ -1,0 +1,10 @@
+artifact_location: file:///Users/fernandohernandezesquivel/Documents/MLops_Project/mlflow_runs/353615530630397546/models/m-b33bf1c02fb045638336a4da27984e6b/artifacts
+creation_timestamp: 1782076692516
+experiment_id: '353615530630397546'
+last_updated_timestamp: 1782076696409
+model_id: m-b33bf1c02fb045638336a4da27984e6b
+model_type: null
+name: xgboost_model
+source_run_id: e64a29d64dae40dbb03446aa3b95d0a5
+status: 2
+status_message: null
