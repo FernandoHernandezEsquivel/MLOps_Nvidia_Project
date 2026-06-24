@@ -40,7 +40,7 @@ if st.sidebar.button("🔌 Verificar API"):
 
 # ============ DATOS HISTÓRICOS CON CURL_CFFI ============
 def load_historical_data():
-    """Carga datos históricos usando curl_cffi para evitar bloqueos."""
+    """Carga datos históricos usando curl_cffi y aplana el MultiIndex."""
     try:
         from curl_cffi import requests as cffi_requests
         
@@ -62,8 +62,14 @@ def load_historical_data():
             st.error("❌ No se obtuvieron datos de Yahoo Finance")
             return pd.DataFrame()
         
+        # ✅ CORREGIDO: Aplanar MultiIndex si existe
+        if isinstance(df.columns, pd.MultiIndex):
+            # Si hay MultiIndex, tomar solo el primer nivel (Close, High, etc.)
+            df.columns = df.columns.get_level_values(0)
+        
         df.reset_index(inplace=True)
         st.success(f"✅ Datos cargados: {len(df)} registros")
+        st.write(f"**Columnas aplanadas:** {df.columns.tolist()}")
         return df
         
     except ImportError as e:
