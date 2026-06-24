@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # ============ CONFIGURACIÓN MLFLOW ============
 # Ruta absoluta del proyecto
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.getenv("APP_DIR", "/app")
 MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
 
 # Crear el directorio si no existe
