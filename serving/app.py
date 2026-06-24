@@ -15,21 +15,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============ CONFIGURACIÓN MLFLOW ============
-import os
-import tempfile
-
-# Obtener la ruta base del proyecto
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ruta absoluta del proyecto
+BASE_DIR = os.getenv("APP_DIR", "/app")
 MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
 
-# Intentar crear el directorio, con fallback a temporal
-try:
-    os.makedirs(MLFLOW_DIR, exist_ok=True)
-    print(f"📁 MLflow directory: {MLFLOW_DIR}")
-except PermissionError:
-    # En entornos sin permisos (GitHub Actions), usar directorio temporal
-    MLFLOW_DIR = tempfile.mkdtemp(prefix="mlflow_")
-    print(f"⚠️ Usando directorio temporal: {MLFLOW_DIR}")
+# Crear el directorio si no existe
+os.makedirs(MLFLOW_DIR, exist_ok=True)
+
+print(f"\n🔍 Configuración MLflow:")
+print(f"   📁 Directorio base: {BASE_DIR}")
+print(f"   📁 MLflow dir: {MLFLOW_DIR}")
+print(f"   📁 Existe: {os.path.exists(MLFLOW_DIR)}")
 
 # Configurar MLflow
 mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
