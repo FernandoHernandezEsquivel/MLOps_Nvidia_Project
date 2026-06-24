@@ -8,48 +8,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 import logging
+import glob
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============ CONFIGURACIÓN MLFLOW ============
-# Método 1: Usar ruta absoluta (más seguro)
+# Ruta absoluta del proyecto
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
-
-# ============ CARGA DIRECTA DEL MODELO ============
-def load_model_from_path():
-    """Carga el modelo directamente desde la ruta del archivo"""
-    try:
-        # Buscar la versión más reciente
-        import glob
-        model_path = f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-4"
-        
-        print(f"🔄 Intentando cargar desde: {model_path}")
-        
-        if os.path.exists(model_path):
-            model = mlflow.sklearn.load_model(model_path)
-            print(f"✅ Modelo cargado exitosamente desde: {model_path}")
-            return model, "version-4"
-        else:
-            print(f"❌ Ruta no encontrada: {model_path}")
-            
-            # Intentar con cualquier versión disponible
-            version_paths = glob.glob(f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-*")
-            if version_paths:
-                latest_path = sorted(version_paths)[-1]
-                print(f"🔄 Intentando con: {latest_path}")
-                model = mlflow.sklearn.load_model(latest_path)
-                print(f"✅ Modelo cargado desde: {latest_path}")
-                return model, os.path.basename(latest_path)
-            
-            return None, None
-    except Exception as e:
-        print(f"❌ Error en carga directa: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
 
 # Crear el directorio si no existe
 os.makedirs(MLFLOW_DIR, exist_ok=True)
@@ -59,39 +27,74 @@ print(f"   📁 Directorio base: {BASE_DIR}")
 print(f"   📁 MLflow dir: {MLFLOW_DIR}")
 print(f"   📁 Existe: {os.path.exists(MLFLOW_DIR)}")
 
-if not os.path.exists(MLFLOW_DIR):
-    print(f"   ❌ Error: Directorio no encontrado")
-    print(f"   💡 Asegúrate de ejecutar desde: {BASE_DIR}")
-    sys.exit(1)
-
 # Configurar MLflow
 mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
 logger.info(f"✅ MLflow configurado: {mlflow.get_tracking_uri()}")
 
-# ============ VERIFICACIÓN Y CARGA DIRECTA ============
-# Función para cargar el modelo directamente desde la carpeta
-def load_model_direct():
-    """Carga el modelo directamente desde la carpeta mlflow_runs"""
-    try:
-        # Buscar la versión más reciente
-        import glob
-        model_paths = glob.glob(f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-*")
-        if model_paths:
-            latest_version = sorted(model_paths)[-1]
-            print(f"🔄 Cargando modelo desde: {latest_version}")
-            model = mlflow.sklearn.load_model(latest_version)
-            print(f"✅ Modelo cargado exitosamente desde {latest_version}")
-            return model, "direct"
-    except Exception as e:
-        print(f"❌ Error en carga directa: {e}")
-    return None, None
+# ============ NOMBRE DEL MODELO Y ALIAS ============
+MODEL_NAME = "NVIDIA_Price_Predictor"
+MODEL_ALIAS = "champion"  # Usamos alias en lugar de stage
 
-# Intentar cargar el modelo directamente
-model, model_version = load_model_direct()
+# ============ CARGA DEL MODELO (UNIFICADA) ============
+def load_model():
+    """
+    Carga el modelo usando alias 'champion'.
+    Si falla, intenta con la última versión.
+    Si todo falla, intenta carga directa.
+    """
+    try:
+        # Estrategia 1: Cargar por alias
+        try:
+            model_uri = f"models:/{MODEL_NAME}@{MODEL_ALIAS}"
+            print(f"🔄 Intentando cargar por alias: {model_uri}")
+            model = mlflow.sklearn.load_model(model_uri)
+            print(f"✅ Modelo cargado por alias '{MODEL_ALIAS}'")
+            return model, MODEL_ALIAS
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar por alias: {e}")
+        
+        # Estrategia 2: Cargar la última versión
+        try:
+            model_uri = f"models:/{MODEL_NAME}/latest"
+            print(f"🔄 Intentando cargar última versión: {model_uri}")
+            model = mlflow.sklearn.load_model(model_uri)
+            print(f"✅ Modelo cargado (última versión)")
+            return model, "latest"
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar la última versión: {e}")
+        
+        # Estrategia 3: Carga directa desde la carpeta
+        try:
+            version_paths = glob.glob(f"{MLFLOW_DIR}/models/{MODEL_NAME}/version-*")
+            if version_paths:
+                latest_path = sorted(version_paths)[-1]
+                print(f"🔄 Cargando directamente desde: {latest_path}")
+                model = mlflow.sklearn.load_model(latest_path)
+                print(f"✅ Modelo cargado desde {latest_path}")
+                return model, os.path.basename(latest_path)
+        except Exception as e:
+            print(f"⚠️ Error en carga directa: {e}")
+        
+        # Si todo falla
+        print("❌ Todas las estrategias de carga fallaron")
+        return None, None
+        
+    except Exception as e:
+        print(f"❌ Error general en carga: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+# ============ INICIALIZACIÓN ============
+print("🚀 Iniciando API de predicción NVIDIA...")
+
+# Cargar el modelo al inicio
+model, model_version = load_model()
+
 if model is not None:
     print(f"✅ Modelo listo para usar (versión: {model_version})")
 else:
-    print("❌ No se pudo cargar el modelo")
+    print("❌ NO se pudo cargar el modelo. La API funcionará en modo limitado.")
 
 # ============ ESQUEMA DE DATOS ============
 class ModelInput(BaseModel):
@@ -117,56 +120,6 @@ class ModelPrediction(BaseModel):
     confidence_interval_lower: Optional[float] = Field(None, description="Límite inferior del intervalo de confianza")
     confidence_interval_upper: Optional[float] = Field(None, description="Límite superior del intervalo de confianza")
 
-# ============ CARGA DEL MODELO ============
-MODEL_NAME = "NVIDIA_Price_Predictor"
-MODEL_STAGE = "Production"
-
-def load_model_simple():
-    """Carga el modelo directamente desde la ruta conocida"""
-    try:
-        # Ruta directa al modelo (versión 4)
-        model_path = "/app/mlflow_runs/models/NVIDIA_Price_Predictor/version-4"
-        
-        print(f"🔄 Intentando cargar modelo desde: {model_path}")
-        
-        # Verificar que existe el archivo del modelo
-        import glob
-        model_files = glob.glob(f"{model_path}/*.pkl") + glob.glob(f"{model_path}/*.joblib")
-        
-        if not model_files:
-            print(f"❌ No se encontraron archivos de modelo en {model_path}")
-            # Buscar en cualquier versión
-            version_paths = glob.glob("/app/mlflow_runs/models/NVIDIA_Price_Predictor/version-*")
-            if version_paths:
-                latest_path = sorted(version_paths)[-1]
-                print(f"🔄 Intentando con: {latest_path}")
-                model = mlflow.sklearn.load_model(latest_path)
-                print(f"✅ Modelo cargado desde: {latest_path}")
-                return model, os.path.basename(latest_path)
-            return None, None
-        
-        # Cargar el modelo
-        model = mlflow.sklearn.load_model(model_path)
-        print(f"✅ Modelo cargado exitosamente desde: {model_path}")
-        return model, "version-4"
-        
-    except Exception as e:
-        print(f"❌ Error cargando modelo: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
-
-# ============ INICIALIZACIÓN ============
-print("🚀 Iniciando API de predicción NVIDIA...")
-
-# Cargar el modelo al inicio
-model, model_version = load_model_simple()
-
-if model is not None:
-    print(f"✅ Modelo listo para usar (versión: {model_version})")
-else:
-    print("❌ NO se pudo cargar el modelo. La API funcionará en modo limitado.")
-
 # ============ FASTAPI APP ============
 app = FastAPI(
     title="NVIDIA Stock Price Predictor API",
@@ -174,21 +127,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-model = None
-model_version = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Verifica que el modelo está cargado"""
-    global model, model_version
-    
-    if model is not None:
-        print(f"✅ Modelo ya cargado: {model_version}")
-    else:
-        print("❌ No hay modelo cargado. Intentando recargar...")
-        model, model_version = load_model_simple()
-        if model is not None:
-            print(f"✅ Modelo recargado: {model_version}")
+@app.get("/")
+async def root():
+    return {
+        "message": "NVIDIA Stock Price Predictor API",
+        "model_name": MODEL_NAME,
+        "model_version": model_version,
+        "status": "ready" if model is not None else "not_ready"
+    }
 
 @app.get("/health")
 async def health():
@@ -207,9 +153,7 @@ async def predict(data: ModelInput):
         # Convertir datos a DataFrame
         input_df = pd.DataFrame([data.model_dump()])
         
-        # ✅ IMPORTANTE: Reordenar columnas en el orden que espera el modelo
-        # Los modelos XGBoost requieren que las columnas estén en el mismo orden
-        # que durante el entrenamiento
+        # Reordenar columnas en el orden que espera el modelo
         expected_columns = model.feature_names_in_
         input_df = input_df[expected_columns]
         
@@ -219,7 +163,7 @@ async def predict(data: ModelInput):
         # Preparar respuesta
         response = ModelPrediction(
             predicted_price=float(prediction),
-            model_version=str(model_version) if model_version else "latest",
+            model_version=str(model_version) if model_version else "unknown",
             confidence_interval_lower=float(prediction * 0.95),
             confidence_interval_upper=float(prediction * 1.05)
         )
