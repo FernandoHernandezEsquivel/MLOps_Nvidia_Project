@@ -1,7 +1,6 @@
-aliases: {}
+aliases:
+  champion: '4'
 creation_timestamp: 1781990473480
-deployment_job_id: null
-deployment_job_state: null
 description: null
-last_updated_timestamp: 1782078807637
+last_updated_timestamp: 1782321148102
 name: NVIDIA_Price_Predictor

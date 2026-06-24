@@ -10,10 +10,33 @@ import sys
 import argparse
 from datetime import datetime
 
-# Configurar MLflow
-os.environ["MLFLOW_TRACKING_URI"] = "file:./mlflow_runs"
-mlflow.set_tracking_uri("file:./mlflow_runs")
+# ============ CONFIGURACIÓN ============
+# Obtener la ruta absoluta del proyecto
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
 
+# Verificar que el directorio existe
+if not os.path.exists(MLFLOW_DIR):
+    print(f"❌ Error: El directorio {MLFLOW_DIR} no existe")
+    print(f"💡 Asegúrate de ejecutar el script desde la raíz del proyecto")
+    sys.exit(1)
+
+# Configurar MLflow
+os.environ["MLFLOW_TRACKING_URI"] = f"file:{MLFLOW_DIR}"
+mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
+
+print(f"🔍 MLflow configurado en: {MLFLOW_DIR}")
+print(f"📁 Existe: {os.path.exists(MLFLOW_DIR)}")
+
+# Verificar que MLflow está instalado
+try:
+    print(f"✅ MLflow {mlflow.__version__} instalado")
+except:
+    print("❌ Error: MLflow no está instalado")
+    print("💡 Ejecuta: pip install mlflow")
+    sys.exit(1)
+
+# ============ FUNCIONES ============
 def list_models():
     """Lista todos los modelos registrados con sus versiones."""
     client = MlflowClient()
@@ -38,14 +61,8 @@ def list_models():
                 'Archived': '📁'
             }.get(v.stage, '📦')
             
-            # Obtener métricas del run
-            run = client.get_run(v.run_id)
-            metrics = run.data.metrics
-            metrics_str = ", ".join([f"{k}={v:.4f}" for k, v in list(metrics.items())[:3]])
-            
             print(f"   {stage_emoji} Versión {v.version} ({v.stage})")
             print(f"      Run ID: {v.run_id[:8]}...")
-            print(f"      Métricas: {metrics_str}")
             print(f"      Creado: {datetime.fromtimestamp(v.creation_timestamp/1000).strftime('%Y-%m-%d %H:%M')}")
 
 def get_model_versions(model_name):
@@ -58,16 +75,7 @@ def get_model_versions(model_name):
         return []
 
 def promote_model(model_name, version, stage="Production", archive=True, require_approval=True):
-    """
-    Promociona un modelo a una etapa específica.
-    
-    Args:
-        model_name: Nombre del modelo
-        version: Número de versión
-        stage: Etapa destino ('Staging', 'Production', 'Archived')
-        archive: Si archivar versiones existentes
-        require_approval: Si requiere confirmación manual
-    """
+    """Promociona un modelo a una etapa específica."""
     client = MlflowClient()
     
     # Verificar que el modelo existe
@@ -95,7 +103,6 @@ def promote_model(model_name, version, stage="Production", archive=True, require
         print(f"   Modelo: {model_name}")
         print(f"   Versión: {version}")
         print(f"   Etapa destino: {stage}")
-        print(f"   📊 Revisa métricas en: http://localhost:5000")
         
         response = input("\n¿Aprobar promoción? (s/n): ")
         if response.lower() != 's':
@@ -116,50 +123,7 @@ def promote_model(model_name, version, stage="Production", archive=True, require
         print(f"❌ Error al promocionar: {e}")
         return False
 
-def rollback_model(model_name, version):
-    """Hace rollback a una versión anterior en producción."""
-    client = MlflowClient()
-    
-    # Obtener versión actual en producción
-    versions = get_model_versions(model_name)
-    current_prod = [v for v in versions if v.stage == "Production"]
-    
-    if not current_prod:
-        print("❌ No hay versión en producción")
-        return False
-    
-    current_version = current_prod[0].version
-    
-    # Confirmar rollback
-    print(f"\n⚠️ ROLLBACK")
-    print(f"   Modelo: {model_name}")
-    print(f"   Versión actual en producción: {current_version}")
-    print(f"   Versión destino: {version}")
-    
-    response = input("¿Confirmar rollback? (s/n): ")
-    if response.lower() != 's':
-        print("❌ Rollback cancelado")
-        return False
-    
-    try:
-        # Archivar versión actual
-        client.transition_model_version_stage(
-            name=model_name,
-            version=current_version,
-            stage="Archived"
-        )
-        # Promocionar versión anterior
-        client.transition_model_version_stage(
-            name=model_name,
-            version=version,
-            stage="Production"
-        )
-        print(f"✅ Rollback completado. Producción ahora en versión {version}")
-        return True
-    except Exception as e:
-        print(f"❌ Error en rollback: {e}")
-        return False
-
+# ============ MAIN ============
 def main():
     parser = argparse.ArgumentParser(
         description='Promocionar modelos en MLflow',
@@ -168,31 +132,22 @@ def main():
 Ejemplos:
   python scripts/promote_model.py --list
   python scripts/promote_model.py --model NVIDIA_Price_Predictor --version 1 --stage Production
-  python scripts/promote_model.py --model NVIDIA_Price_Predictor --rollback 1
-  python scripts/promote_model.py --auto --stage Production
+  python scripts/promote_model.py --auto --stage Production --no-approval
         """
     )
     parser.add_argument('--list', action='store_true', help='Listar todos los modelos')
     parser.add_argument('--model', type=str, default="NVIDIA_Price_Predictor", help='Nombre del modelo')
     parser.add_argument('--version', type=int, help='Versión a promocionar')
-    parser.add_argument('--stage', type=str, default="Production", help='Etapa destino (Staging/Production/Archived)')
-    parser.add_argument('--rollback', type=int, help='Hacer rollback a la versión especificada')
-    parser.add_argument('--auto', action='store_true', help='Promocionar automáticamente la última versión (sin aprobación)')
+    parser.add_argument('--stage', type=str, default="Production", help='Etapa destino')
+    parser.add_argument('--auto', action='store_true', help='Promocionar automáticamente la última versión')
     parser.add_argument('--no-approval', action='store_true', help='Saltar aprobación manual')
     
     args = parser.parse_args()
     
-    # Caso 1: Listar modelos
     if args.list:
         list_models()
         sys.exit(0)
     
-    # Caso 2: Rollback
-    if args.rollback:
-        rollback_model(args.model, args.rollback)
-        sys.exit(0)
-    
-    # Caso 3: Promoción automática (última versión)
     if args.auto:
         versions = get_model_versions(args.model)
         if versions:
@@ -202,7 +157,6 @@ Ejemplos:
             print(f"❌ No hay versiones para {args.model}")
         sys.exit(0)
     
-    # Caso 4: Promoción manual
     if args.version:
         promote_model(args.model, args.version, args.stage, require_approval=not args.no_approval)
     else:
