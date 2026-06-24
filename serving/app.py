@@ -35,6 +35,31 @@ if not os.path.exists(MLFLOW_DIR):
 mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
 logger.info(f"✅ MLflow configurado: {mlflow.get_tracking_uri()}")
 
+# ============ VERIFICACIÓN Y CARGA DIRECTA ============
+# Función para cargar el modelo directamente desde la carpeta
+def load_model_direct():
+    """Carga el modelo directamente desde la carpeta mlflow_runs"""
+    try:
+        # Buscar la versión más reciente
+        import glob
+        model_paths = glob.glob(f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-*")
+        if model_paths:
+            latest_version = sorted(model_paths)[-1]
+            print(f"🔄 Cargando modelo desde: {latest_version}")
+            model = mlflow.sklearn.load_model(latest_version)
+            print(f"✅ Modelo cargado exitosamente desde {latest_version}")
+            return model, "direct"
+    except Exception as e:
+        print(f"❌ Error en carga directa: {e}")
+    return None, None
+
+# Intentar cargar el modelo directamente
+model, model_version = load_model_direct()
+if model is not None:
+    print(f"✅ Modelo listo para usar (versión: {model_version})")
+else:
+    print("❌ No se pudo cargar el modelo")
+
 # ============ ESQUEMA DE DATOS ============
 class ModelInput(BaseModel):
     Open: float = Field(..., description="Precio de apertura")
@@ -142,24 +167,23 @@ async def startup_event():
     global model, model_version
     
     try:
+        # Intentar carga directa primero
+        model, model_version = load_model_direct()
+        if model is not None:
+            print(f"✅ Modelo cargado exitosamente (versión: {model_version})")
+            return
+        
+        # Si falla, intentar con MLflow normal
+        print("🔄 Intentando carga con MLflow...")
         model, model_version = load_model()
         if model is not None:
-            print(f"✅ Modelo cargado exitosamente. Versión: {model_version}")
+            print(f"✅ Modelo cargado exitosamente (versión: {model_version})")
         else:
             print("❌ No se pudo cargar el modelo")
     except Exception as e:
         print(f"❌ Error en startup: {e}")
         model = None
         model_version = None
-
-@app.get("/")
-async def root():
-    return {
-        "message": "NVIDIA Stock Price Predictor API",
-        "model_name": MODEL_NAME,
-        "model_version": model_version,
-        "status": "ready" if model is not None else "not_ready"
-    }
 
 @app.get("/health")
 async def health():
