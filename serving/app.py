@@ -37,52 +37,29 @@ MODEL_ALIAS = "champion"  # Usamos alias en lugar de stage
 
 # ============ CARGA DEL MODELO (UNIFICADA) ============
 def load_model():
-    """
-    Carga el modelo usando alias 'champion'.
-    Si falla, intenta con la última versión.
-    Si todo falla, intenta carga directa.
-    """
     try:
-        # Estrategia 1: Cargar por alias
-        try:
-            model_uri = f"models:/{MODEL_NAME}@{MODEL_ALIAS}"
-            print(f"🔄 Intentando cargar por alias: {model_uri}")
-            model = mlflow.sklearn.load_model(model_uri)
-            print(f"✅ Modelo cargado por alias '{MODEL_ALIAS}'")
-            return model, MODEL_ALIAS
-        except Exception as e:
-            print(f"⚠️ No se pudo cargar por alias: {e}")
-        
-        # Estrategia 2: Cargar la última versión
-        try:
-            model_uri = f"models:/{MODEL_NAME}/latest"
-            print(f"🔄 Intentando cargar última versión: {model_uri}")
-            model = mlflow.sklearn.load_model(model_uri)
-            print(f"✅ Modelo cargado (última versión)")
-            return model, "latest"
-        except Exception as e:
-            print(f"⚠️ No se pudo cargar la última versión: {e}")
-        
-        # Estrategia 3: Carga directa desde la carpeta
-        try:
-            version_paths = glob.glob(f"{MLFLOW_DIR}/models/{MODEL_NAME}/version-*")
-            if version_paths:
-                latest_path = sorted(version_paths)[-1]
-                print(f"🔄 Cargando directamente desde: {latest_path}")
-                model = mlflow.sklearn.load_model(latest_path)
-                print(f"✅ Modelo cargado desde {latest_path}")
-                return model, os.path.basename(latest_path)
-        except Exception as e:
-            print(f"⚠️ Error en carga directa: {e}")
-        
-        # Si todo falla
-        print("❌ Todas las estrategias de carga fallaron")
-        return None, None
-        
+        direct_model_path = os.path.join(
+            MLFLOW_DIR,
+            "504246946478130849",
+            "models",
+            "m-56df30315e2f4c298c656aa55c3741fd",
+            "artifacts"
+        )
+
+        print(f"🔄 Cargando modelo desde: {direct_model_path}")
+
+        model = mlflow.sklearn.load_model(direct_model_path)
+
+        print("✅ Modelo cargado correctamente")
+
+        return model, "v4"
+
     except Exception as e:
-        print(f"❌ Error general en carga: {e}")
+        print(f"❌ Error cargando modelo: {e}")
+
         import traceback
         traceback.print_exc()
+
         return None, None
 
 # ============ INICIALIZACIÓN ============
