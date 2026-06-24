@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 import numpy as np
 import time
+from curl_cffi import requests
 
 # ============ CONFIGURACIÓN ============
 # 🔥 ACTUALIZA ESTA URL CON LA DE TU API EN RENDER
@@ -41,11 +42,15 @@ if st.sidebar.button("🔌 Verificar API"):
         st.sidebar.error(f"❌ Error: {e}")
 
 # ============ DATOS HISTÓRICOS ============
-@st.cache_data(ttl=3600)  # ✅ CAMBIADO: st.cache_data en lugar de st.cache
+@st.cache_data(ttl=3600)
 def load_historical_data():
-    """Carga datos históricos de NVIDIA."""
     try:
-        df = yf.download("NVDA", period="6mo", interval="1d")
+        # 2. Crea una sesión que imita a Chrome
+        session = requests.Session(impersonate="chrome")
+        # 3. Pásala a yfinance
+        df = yf.download("NVDA", period="6mo", interval="1d", session=session, progress=False)
+        if df.empty:
+            raise Exception("No se obtuvieron datos de Yahoo Finance")
         df.reset_index(inplace=True)
         return df
     except Exception as e:
