@@ -64,40 +64,67 @@ MODEL_NAME = "NVIDIA_Price_Predictor"
 MODEL_STAGE = "Production"
 
 def load_model():
-    """Carga el modelo desde MLflow"""
+    """Carga el modelo desde MLflow con manejo de errores mejorado."""
     try:
-        # Primero, verificar modelos disponibles
+        # Configurar MLflow
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
+        
+        print(f"🔍 Configuración MLflow:")
+        print(f"   📁 Directorio base: {BASE_DIR}")
+        print(f"   📁 MLflow dir: {MLFLOW_DIR}")
+        print(f"   📁 Existe: {os.path.exists(MLFLOW_DIR)}")
+        
+        # Verificar contenido del directorio
+        if os.path.exists(MLFLOW_DIR):
+            print(f"📂 Contenido de {MLFLOW_DIR}:")
+            for item in os.listdir(MLFLOW_DIR):
+                print(f"   - {item}")
+        
+        # Configurar tracking URI
+        mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
+        
+        # Listar modelos disponibles
         client = mlflow.tracking.MlflowClient()
-        models = client.search_registered_models()
+        try:
+            models = client.search_registered_models()
+            print(f"📦 Modelos encontrados: {len(models)}")
+            for model in models:
+                print(f"   - {model.name}")
+                for version in model.latest_versions:
+                    print(f"     Versión {version.version}: {version.stage}")
+        except Exception as e:
+            print(f"⚠️ No se pudieron listar modelos: {e}")
         
-        print("\n📦 Modelos disponibles:")
-        for m in models:
-            print(f"   - {m.name}")
-            for v in m.latest_versions:
-                print(f"     Versión {v.version}: {v.current_stage}")
-        
-        # Intentar cargar el modelo
-        model_uri = f"models:/{MODEL_NAME}@{MODEL_STAGE}"
-        print(f"\n🔄 Cargando: {model_uri}")
-        
-        model = mlflow.sklearn.load_model(model_uri)
-        print("✅ Modelo cargado exitosamente")
-        return model
-        
-    except Exception as e:
-        print(f"❌ Error cargando de etapa '{MODEL_STAGE}': {e}")
+        # Intentar cargar el modelo de producción
+        MODEL_NAME = "NVIDIA_Price_Predictor"
+        MODEL_STAGE = "Production"
         
         try:
-            # Intentar con la última versión
-            model_uri = f"models:/{MODEL_NAME}/latest"
-            print(f"🔄 Intentando: {model_uri}")
+            model_uri = f"models:/{MODEL_NAME}@{MODEL_STAGE}"
+            print(f"🔄 Intentando cargar: {model_uri}")
             model = mlflow.sklearn.load_model(model_uri)
-            print("✅ Modelo cargado (última versión)")
-            return model
+            print(f"✅ Modelo cargado desde {MODEL_STAGE}")
+            return model, "Production"
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar de {MODEL_STAGE}: {e}")
             
-        except Exception as e2:
-            print(f"❌ Error final: {e2}")
-            raise RuntimeError(f"No se pudo cargar el modelo '{MODEL_NAME}'")
+            # Intentar con la última versión
+            try:
+                model_uri = f"models:/{MODEL_NAME}/latest"
+                print(f"🔄 Intentando con última versión: {model_uri}")
+                model = mlflow.sklearn.load_model(model_uri)
+                print(f"✅ Modelo cargado (última versión)")
+                return model, "latest"
+            except Exception as e2:
+                print(f"❌ Error final: {e2}")
+                return None, None
+                
+    except Exception as e:
+        print(f"❌ Error general: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
 
 # ============ FASTAPI APP ============
 app = FastAPI(
@@ -115,21 +142,15 @@ async def startup_event():
     global model, model_version
     
     try:
-        model = load_model()
-        
-        # Obtener versión
-        try:
-            client = mlflow.tracking.MlflowClient()
-            latest = client.get_latest_versions(MODEL_NAME, stages=[MODEL_STAGE])
-            model_version = latest[0].version if latest else "latest"
-        except:
-            model_version = "unknown"
-            
-        print(f"✅ Modelo {MODEL_NAME} versión {model_version} cargado")
-        
+        model, model_version = load_model()
+        if model is not None:
+            print(f"✅ Modelo cargado exitosamente. Versión: {model_version}")
+        else:
+            print("❌ No se pudo cargar el modelo")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error en startup: {e}")
         model = None
+        model_version = None
 
 @app.get("/")
 async def root():
