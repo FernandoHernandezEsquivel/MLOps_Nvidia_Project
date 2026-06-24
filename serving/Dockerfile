@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código
 COPY serving/app.py .
 COPY mlflow_runs/ ./mlflow_runs/
+COPY models/ ./models/
 COPY src/ ./src/
 
 # Exponer puerto
