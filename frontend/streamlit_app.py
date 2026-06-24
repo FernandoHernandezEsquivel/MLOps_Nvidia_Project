@@ -265,6 +265,7 @@ with col2:
             st.code(traceback.format_exc())
 
 # ============ ESTADO DEL SISTEMA ============
+# ============ ESTADO DEL SISTEMA ============
 st.markdown("---")
 st.subheader("📊 Estado del Sistema")
 
@@ -288,8 +289,9 @@ with col5:
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
-        rsi = 100 - (100 / (1 + rs.iloc[-1]))
-        rsi_value = float(rsi.iloc[0].item()) if hasattr(rsi.iloc[0], 'item') else 50
+        rsi = 100 - (100 / (1 + rs))
+        # ✅ CORREGIDO: rsi es una Serie, tomamos el último valor
+        rsi_value = float(rsi.iloc[-1]) if not rsi.empty else 50
         st.metric("📈 RSI (14 días)", f"{rsi_value:.1f}")
     else:
         st.metric("📈 RSI (14 días)", "N/A")
