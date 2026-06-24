@@ -18,6 +18,39 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
 
+# ============ CARGA DIRECTA DEL MODELO ============
+def load_model_from_path():
+    """Carga el modelo directamente desde la ruta del archivo"""
+    try:
+        # Buscar la versión más reciente
+        import glob
+        model_path = f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-4"
+        
+        print(f"🔄 Intentando cargar desde: {model_path}")
+        
+        if os.path.exists(model_path):
+            model = mlflow.sklearn.load_model(model_path)
+            print(f"✅ Modelo cargado exitosamente desde: {model_path}")
+            return model, "version-4"
+        else:
+            print(f"❌ Ruta no encontrada: {model_path}")
+            
+            # Intentar con cualquier versión disponible
+            version_paths = glob.glob(f"{MLFLOW_DIR}/models/NVIDIA_Price_Predictor/version-*")
+            if version_paths:
+                latest_path = sorted(version_paths)[-1]
+                print(f"🔄 Intentando con: {latest_path}")
+                model = mlflow.sklearn.load_model(latest_path)
+                print(f"✅ Modelo cargado desde: {latest_path}")
+                return model, os.path.basename(latest_path)
+            
+            return None, None
+    except Exception as e:
+        print(f"❌ Error en carga directa: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
 # Crear el directorio si no existe
 os.makedirs(MLFLOW_DIR, exist_ok=True)
 
@@ -88,68 +121,51 @@ class ModelPrediction(BaseModel):
 MODEL_NAME = "NVIDIA_Price_Predictor"
 MODEL_STAGE = "Production"
 
-def load_model():
-    """Carga el modelo desde MLflow con manejo de errores mejorado."""
+def load_model_simple():
+    """Carga el modelo directamente desde la ruta conocida"""
     try:
-        # Configurar MLflow
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        MLFLOW_DIR = os.path.join(BASE_DIR, "mlflow_runs")
+        # Ruta directa al modelo (versión 4)
+        model_path = "/app/mlflow_runs/models/NVIDIA_Price_Predictor/version-4"
         
-        print(f"🔍 Configuración MLflow:")
-        print(f"   📁 Directorio base: {BASE_DIR}")
-        print(f"   📁 MLflow dir: {MLFLOW_DIR}")
-        print(f"   📁 Existe: {os.path.exists(MLFLOW_DIR)}")
+        print(f"🔄 Intentando cargar modelo desde: {model_path}")
         
-        # Verificar contenido del directorio
-        if os.path.exists(MLFLOW_DIR):
-            print(f"📂 Contenido de {MLFLOW_DIR}:")
-            for item in os.listdir(MLFLOW_DIR):
-                print(f"   - {item}")
+        # Verificar que existe el archivo del modelo
+        import glob
+        model_files = glob.glob(f"{model_path}/*.pkl") + glob.glob(f"{model_path}/*.joblib")
         
-        # Configurar tracking URI
-        mlflow.set_tracking_uri(f"file:{MLFLOW_DIR}")
+        if not model_files:
+            print(f"❌ No se encontraron archivos de modelo en {model_path}")
+            # Buscar en cualquier versión
+            version_paths = glob.glob("/app/mlflow_runs/models/NVIDIA_Price_Predictor/version-*")
+            if version_paths:
+                latest_path = sorted(version_paths)[-1]
+                print(f"🔄 Intentando con: {latest_path}")
+                model = mlflow.sklearn.load_model(latest_path)
+                print(f"✅ Modelo cargado desde: {latest_path}")
+                return model, os.path.basename(latest_path)
+            return None, None
         
-        # Listar modelos disponibles
-        client = mlflow.tracking.MlflowClient()
-        try:
-            models = client.search_registered_models()
-            print(f"📦 Modelos encontrados: {len(models)}")
-            for model in models:
-                print(f"   - {model.name}")
-                for version in model.latest_versions:
-                    print(f"     Versión {version.version}: {version.stage}")
-        except Exception as e:
-            print(f"⚠️ No se pudieron listar modelos: {e}")
+        # Cargar el modelo
+        model = mlflow.sklearn.load_model(model_path)
+        print(f"✅ Modelo cargado exitosamente desde: {model_path}")
+        return model, "version-4"
         
-        # Intentar cargar el modelo de producción
-        MODEL_NAME = "NVIDIA_Price_Predictor"
-        MODEL_STAGE = "Production"
-        
-        try:
-            model_uri = f"models:/{MODEL_NAME}@{MODEL_STAGE}"
-            print(f"🔄 Intentando cargar: {model_uri}")
-            model = mlflow.sklearn.load_model(model_uri)
-            print(f"✅ Modelo cargado desde {MODEL_STAGE}")
-            return model, "Production"
-        except Exception as e:
-            print(f"⚠️ No se pudo cargar de {MODEL_STAGE}: {e}")
-            
-            # Intentar con la última versión
-            try:
-                model_uri = f"models:/{MODEL_NAME}/latest"
-                print(f"🔄 Intentando con última versión: {model_uri}")
-                model = mlflow.sklearn.load_model(model_uri)
-                print(f"✅ Modelo cargado (última versión)")
-                return model, "latest"
-            except Exception as e2:
-                print(f"❌ Error final: {e2}")
-                return None, None
-                
     except Exception as e:
-        print(f"❌ Error general: {e}")
+        print(f"❌ Error cargando modelo: {e}")
         import traceback
         traceback.print_exc()
         return None, None
+
+# ============ INICIALIZACIÓN ============
+print("🚀 Iniciando API de predicción NVIDIA...")
+
+# Cargar el modelo al inicio
+model, model_version = load_model_simple()
+
+if model is not None:
+    print(f"✅ Modelo listo para usar (versión: {model_version})")
+else:
+    print("❌ NO se pudo cargar el modelo. La API funcionará en modo limitado.")
 
 # ============ FASTAPI APP ============
 app = FastAPI(
@@ -163,27 +179,16 @@ model_version = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Carga el modelo al iniciar"""
+    """Verifica que el modelo está cargado"""
     global model, model_version
     
-    try:
-        # Intentar carga directa primero
-        model, model_version = load_model_direct()
+    if model is not None:
+        print(f"✅ Modelo ya cargado: {model_version}")
+    else:
+        print("❌ No hay modelo cargado. Intentando recargar...")
+        model, model_version = load_model_simple()
         if model is not None:
-            print(f"✅ Modelo cargado exitosamente (versión: {model_version})")
-            return
-        
-        # Si falla, intentar con MLflow normal
-        print("🔄 Intentando carga con MLflow...")
-        model, model_version = load_model()
-        if model is not None:
-            print(f"✅ Modelo cargado exitosamente (versión: {model_version})")
-        else:
-            print("❌ No se pudo cargar el modelo")
-    except Exception as e:
-        print(f"❌ Error en startup: {e}")
-        model = None
-        model_version = None
+            print(f"✅ Modelo recargado: {model_version}")
 
 @app.get("/health")
 async def health():
