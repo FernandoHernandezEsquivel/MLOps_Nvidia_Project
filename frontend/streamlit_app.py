@@ -1,4 +1,4 @@
-# frontend/app.py
+# frontend/streamlit_app.py
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -6,56 +6,60 @@ import requests
 import plotly.graph_objects as go
 from datetime import datetime
 import numpy as np
+import time
 
-# --- Configuración de la página ---
+# ============ CONFIGURACIÓN ============
+# 🔥 ACTUALIZA ESTA URL CON LA DE TU API EN RENDER
+API_URL = "https://nvidia-price-api.onrender.com"  # <-- CAMBIA ESTO
+
 st.set_page_config(
     page_title="NVIDIA Stock Predictor",
     page_icon="📈",
     layout="wide"
 )
 
-# --- Título ---
 st.title("📈 NVIDIA Stock Predictor - MLOps Dashboard")
 st.markdown("*Dashboard interactivo para predecir el precio de cierre de NVIDIA*")
 
-# --- Sidebar ---
+# ============ SIDEBAR ============
 st.sidebar.header("⚙️ Configuración")
-api_url = st.sidebar.text_input("URL de la API", value="http://localhost:8000")
+api_url = st.sidebar.text_input("URL de la API", value=API_URL)
 
 # Verificar conexión con la API
 if st.sidebar.button("🔌 Verificar API"):
     try:
-        response = requests.get(f"{api_url}/health", timeout=5)
+        response = requests.get(f"{api_url}/health", timeout=10)
         if response.status_code == 200:
             st.sidebar.success("✅ API conectada correctamente")
+            data = response.json()
+            st.sidebar.info(f"📦 Modelo: {data.get('model_name', 'N/A')} versión {data.get('model_version', 'N/A')}")
         else:
             st.sidebar.error(f"❌ Error: {response.status_code}")
-    except:
-        st.sidebar.error("❌ No se pudo conectar a la API")
+    except requests.exceptions.ConnectionError:
+        st.sidebar.error("❌ No se pudo conectar a la API. Verifica la URL.")
+    except Exception as e:
+        st.sidebar.error(f"❌ Error: {e}")
 
-# --- Carga de datos históricos ---
-@st.cache(ttl=3600)
+# ============ DATOS HISTÓRICOS ============
+@st.cache_data(ttl=3600)  # ✅ CAMBIADO: st.cache_data en lugar de st.cache
 def load_historical_data():
     """Carga datos históricos de NVIDIA."""
-    df = yf.download("NVDA", period="6mo", interval="1d")
-    df.reset_index(inplace=True)
-    return df
+    try:
+        df = yf.download("NVDA", period="6mo", interval="1d")
+        df.reset_index(inplace=True)
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar datos: {e}")
+        return pd.DataFrame()
 
-try:
-    df_hist = load_historical_data()
-    if df_hist.empty:
-        st.error("No se pudieron cargar datos históricos")
-        st.stop()
-except Exception as e:
-    st.error(f"Error al cargar datos históricos: {e}")
+df_hist = load_historical_data()
+if df_hist.empty:
+    st.warning("No se pudieron cargar datos históricos. Verifica tu conexión a internet.")
     st.stop()
 
-# ============================================
-# SECCIÓN 1: GRÁFICO Y PREDICCIÓN
-# ============================================
+# ============ GRÁFICO Y PREDICCIÓN ============
 col1, col2 = st.columns([2, 1])
 
-# --- Columna 1: Gráfico histórico ---
 with col1:
     st.subheader("📊 Precio Histórico (Últimos 6 meses)")
     
@@ -93,9 +97,8 @@ with col1:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)  # ✅ Se mantiene por ahora
 
-# --- Columna 2: Panel de predicción ---
 with col2:
     st.subheader("🔮 Hacer una Predicción")
     st.markdown("Ingresa los datos del día actual:")
@@ -109,11 +112,11 @@ with col2:
     open_price = st.number_input("Open", value=last_open, format="%.2f")
     high_price = st.number_input("High", value=last_high, format="%.2f")
     low_price = st.number_input("Low", value=last_low, format="%.2f")
-    close_price = st.number_input("Close (precio de cierre actual)", value=last_close, format="%.2f")
+    close_price = st.number_input("Close", value=last_close, format="%.2f")
     volume = st.number_input("Volume", value=last_volume)
     
     if st.button("🚀 Predecir Precio de Cierre"):
-        # Calcular todas las features
+        # Calcular features
         if len(df_hist) >= 2:
             return_1d = (df_hist['Close'].iloc[-1].item() / df_hist['Close'].iloc[-2].item() - 1)
         else:
@@ -129,27 +132,13 @@ with col2:
         else:
             return_10d = 0.0
         
-        if len(df_hist) >= 10:
-            ma_10 = float(df_hist['Close'].rolling(10).mean().iloc[-1].item())
-        else:
-            ma_10 = close_price
-        
-        if len(df_hist) >= 50:
-            ma_50 = float(df_hist['Close'].rolling(50).mean().iloc[-1].item())
-        else:
-            ma_50 = close_price
+        ma_10 = float(df_hist['Close'].rolling(10).mean().iloc[-1].item()) if len(df_hist) >= 10 else close_price
+        ma_50 = float(df_hist['Close'].rolling(50).mean().iloc[-1].item()) if len(df_hist) >= 50 else close_price
         
         returns = df_hist['Close'].pct_change()
-        if len(df_hist) >= 10:
-            volatility_10d = float(returns.rolling(10).std().iloc[-1].item())
-        else:
-            volatility_10d = 0.02
+        volatility_10d = float(returns.rolling(10).std().iloc[-1].item()) if len(df_hist) >= 10 else 0.02
         
-        if len(df_hist) >= 10:
-            volume_ma_10 = float(df_hist['Volume'].rolling(10).mean().iloc[-1].item())
-        else:
-            volume_ma_10 = volume
-        
+        volume_ma_10 = float(df_hist['Volume'].rolling(10).mean().iloc[-1].item()) if len(df_hist) >= 10 else volume
         volume_ratio = volume / volume_ma_10 if volume_ma_10 > 0 else 1.0
         high_low_ratio = high_price / low_price if low_price > 0 else 1.0
         close_open_ratio = close_price / open_price if open_price > 0 else 1.0
@@ -172,12 +161,9 @@ with col2:
             "Close_Open_Ratio": float(close_open_ratio)
         }
         
-        with st.sidebar.expander("📤 Ver payload enviado"):
-            st.json(payload)
-        
         try:
             with st.spinner("⏳ Prediciendo..."):
-                response = requests.post(f"{api_url}/predict", json=payload, timeout=10)
+                response = requests.post(f"{api_url}/predict", json=payload, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
@@ -191,31 +177,23 @@ with col2:
                 difference = prediction - actual_close
                 diff_pct = (difference / actual_close) * 100
                 
-                # ✅ CORREGIDO: Sin columnas anidadas
                 st.write("---")
                 st.write(f"**📊 Precio Actual:** ${actual_close:.2f} | **🔮 Predicción:** ${prediction:.2f} | **📈 Diferencia:** {diff_pct:.2f}%")
-                
-                # Intervalo de confianza en una línea
-                if "confidence_interval_lower" in result and "confidence_interval_upper" in result:
-                    lower = result['confidence_interval_lower']
-                    upper = result['confidence_interval_upper']
-                    st.info(f"📊 Intervalo de confianza (95%): **${lower:.2f}** ↔ **${upper:.2f}**")
-            
             else:
                 st.error(f"❌ Error en la API: {response.status_code}")
+                st.json(response.json() if response.content else {})
         except requests.exceptions.ConnectionError:
-            st.error("❌ No se pudo conectar a la API. ¿Está el servidor ejecutándose?")
-            st.info("💡 Ejecuta: `python serving/app.py`")
+            st.error("❌ No se pudo conectar a la API. Verifica la URL.")
+            st.info(f"📡 URL configurada: {api_url}")
+        except requests.exceptions.Timeout:
+            st.error("❌ Tiempo de espera agotado. La API tardó demasiado en responder.")
         except Exception as e:
             st.error(f"❌ Error inesperado: {e}")
 
-# ============================================
-# SECCIÓN 2: MONITOREO (FUERA DE LAS COLUMNAS)
-# ============================================
+# ============ ESTADO DEL SISTEMA ============
 st.markdown("---")
 st.subheader("📊 Estado del Sistema")
 
-# ✅ Crear nuevas columnas FUERA del contexto de col1/col2
 col3, col4, col5, col6 = st.columns(4)
 
 with col3:
@@ -238,17 +216,14 @@ with col5:
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs.iloc[-1]))
         rsi_value = float(rsi.iloc[0].item()) if hasattr(rsi.iloc[0], 'item') else 50
-        st.metric("📈 RSI (14 días)", f"{rsi_value:.1f}",
-                  delta="Sobrecomprado" if rsi_value > 70 else "Sobrevendido" if rsi_value < 30 else "Neutral")
+        st.metric("📈 RSI (14 días)", f"{rsi_value:.1f}")
     else:
         st.metric("📈 RSI (14 días)", "N/A")
 
 with col6:
     st.metric("📅 Última actualización", datetime.now().strftime("%H:%M:%S"))
 
-# ============================================
-# SECCIÓN 3: TABLA DE DATOS
-# ============================================
+# ============ TABLA DE DATOS ============
 st.markdown("---")
 st.subheader("📋 Datos Recientes")
 with st.expander("Ver tabla de datos históricos"):
