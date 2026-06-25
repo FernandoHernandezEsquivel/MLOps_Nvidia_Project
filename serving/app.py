@@ -127,25 +127,36 @@ async def predict(data: ModelInput):
         raise HTTPException(status_code=503, detail="Modelo no disponible")
     
     try:
-        # ✅ Compatible con Pydantic v1 y v2
-        try:
-            # Pydantic v2
+        # ✅ Extraer datos (compatible con Pydantic v1 y v2)
+        if hasattr(data, 'model_dump'):
             input_data = data.model_dump()
-        except AttributeError:
-            # Pydantic v1
+        elif hasattr(data, 'dict'):
             input_data = data.dict()
-            
-            # Convertir datos a DataFrame
-            input_df = pd.DataFrame([input_data])
+        else:
+            raise ValueError("El objeto data no tiene método model_dump() ni dict()")
         
-        # Reordenar columnas en el orden que espera el modelo
+        # ✅ Verificar que input_data es un diccionario
+        if not isinstance(input_data, dict):
+            raise ValueError(f"input_data no es un diccionario: {type(input_data)}")
+        
+        logger.info(f"📥 Datos recibidos: {input_data}")
+        
+        # ✅ Crear DataFrame
+        input_df = pd.DataFrame([input_data])
+        
+        # ✅ Verificar columnas esperadas
         expected_columns = model.feature_names_in_
+        missing_cols = [col for col in expected_columns if col not in input_df.columns]
+        if missing_cols:
+            raise ValueError(f"Columnas faltantes en la solicitud: {missing_cols}")
+        
+        # ✅ Reordenar columnas
         input_df = input_df[expected_columns]
         
-        # Hacer predicción
+        # ✅ Hacer predicción
         prediction = model.predict(input_df)[0]
         
-        # Preparar respuesta
+        # ✅ Preparar respuesta
         response = ModelPrediction(
             predicted_price=float(prediction),
             model_version=str(model_version) if model_version else "unknown",
@@ -156,9 +167,14 @@ async def predict(data: ModelInput):
         logger.info(f"📊 Predicción: {response.predicted_price:.4f}")
         return response
         
+    except ValueError as ve:
+        logger.error(f"❌ Error de validación: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"❌ Error en predicción: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
