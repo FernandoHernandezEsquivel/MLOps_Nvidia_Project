@@ -127,8 +127,16 @@ async def predict(data: ModelInput):
         raise HTTPException(status_code=503, detail="Modelo no disponible")
     
     try:
-        # Convertir datos a DataFrame
-        input_df = pd.DataFrame([data.model_dump()])
+        # ✅ Compatible con Pydantic v1 y v2
+        try:
+            # Pydantic v2
+            input_data = data.model_dump()
+        except AttributeError:
+            # Pydantic v1
+            input_data = data.dict()
+            
+            # Convertir datos a DataFrame
+            input_df = pd.DataFrame([input_data])
         
         # Reordenar columnas en el orden que espera el modelo
         expected_columns = model.feature_names_in_
